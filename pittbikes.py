@@ -27,11 +27,11 @@ class Bike():
 
         self.info_by_id = {}
         for s in self.station_info["data"]["stations"]:
-            self.info_by_id[s["station_id"]] = s
+            self.info_by_id[str(s["station_id"])] = s
 
         self.status_by_id = {}
         for s in self.station_status["data"]["stations"]:
-            self.status_by_id[s["station_id"]] = s
+            self.status_by_id[str(s["station_id"])] = s
 
     def total_bikes(self):
         total = 0
@@ -46,7 +46,7 @@ class Bike():
         return total
 
     def percent_avail(self, station_id):
-        station = self.status_by_id.get(station_id)
+        station = self.status_by_id.get(str(station_id))
         if station is None:
             return ""
 
