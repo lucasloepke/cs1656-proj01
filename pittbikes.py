@@ -5,7 +5,6 @@ import json
 import glob
 import math
 import os
-import pandas
 import re
 import requests
 import string
@@ -16,33 +15,110 @@ import ssl
 
 class Bike():
     def __init__(self, baseURL, station_info, station_status):
-        # initialize the instance
-        pass
+        self.baseURL = baseURL
+        self.station_info_name = station_info
+        self.station_status_name = station_status
+
+        info_url = baseURL + "/" + station_info
+        status_url = baseURL + "/" + station_status
+
+        self.station_info = requests.get(info_url).json()
+        self.station_status = requests.get(status_url).json()
+
+        self.info_by_id = {}
+        for s in self.station_info["data"]["stations"]:
+            self.info_by_id[s["station_id"]] = s
+
+        self.status_by_id = {}
+        for s in self.station_status["data"]["stations"]:
+            self.status_by_id[s["station_id"]] = s
 
     def total_bikes(self):
-        # return the total number of bikes available
-        return None
+        total = 0
+        for station in self.station_status["data"]["stations"]:
+            total += station.get("num_bikes_available", 0)
+        return total
 
     def total_docks(self):
-        # return the total number of docks available
-        return None
+        total = 0
+        for station in self.station_status["data"]["stations"]:
+            total += station.get("num_docks_available", 0)
+        return total
 
     def percent_avail(self, station_id):
-        # return the percentage of available docks
-        return None
+        station = self.status_by_id.get(station_id)
+        if station is None:
+            return ""
+
+        bikes = station.get("num_bikes_available", 0)
+        docks = station.get("num_docks_available", 0)
+        total = bikes + docks
+        if total == 0:
+            return "0%"
+
+        percentage = math.floor((docks / total) * 100)
+        return str(percentage) + "%"
 
     def closest_stations(self, latitude, longitude):
-        # return the stations closest to the given coordinates
-        return None
+        distances = []
+
+        for station_id, info in self.info_by_id.items():
+            lat = info.get("lat")
+            lon = info.get("lon")
+            if lat is None or lon is None:
+                continue
+
+            d = self.distance(latitude, longitude, lat, lon)
+            distances.append((d, str(station_id), info.get("name", "")))
+
+        distances.sort(key=lambda x: x[0])
+
+        result = {}
+        for _, station_id, name in distances[:3]:
+            result[station_id] = name
+        return result
 
 
     def closest_bike(self, latitude, longitude):
-        # return the station with available bikes closest to the given coordinates
-        return None
+        candidates = []
+
+        for station_id, status in self.status_by_id.items():
+            if status.get("num_bikes_available", 0) <= 0:
+                continue
+
+            info = self.info_by_id.get(station_id)
+            if info is None:
+                continue
+
+            lat = info.get("lat")
+            lon = info.get("lon")
+            if lat is None or lon is None:
+                continue
+
+            dist = self.distance(latitude, longitude, lat, lon)
+            candidates.append((dist, str(station_id), info.get("name", "")))
+
+        if not candidates:
+            return {}
+
+        candidates.sort(key=lambda x: x[0])
+        _, station_id, name = candidates[0]
+        return {station_id: name}
         
     def station_bike_avail(self, latitude, longitude):
-        # return the station id and available bikes that correspond to the station with the given coordinates
-        return None
+        for station_id, info in self.info_by_id.items():
+            lat = info.get("lat")
+            lon = info.get("lon")
+            if lat is None or lon is None:
+                continue
+
+            if float(lat) == float(latitude) and float(lon) == float(longitude):
+                status = self.status_by_id.get(station_id)
+                if status is None:
+                    return {}
+                return {str(station_id): int(status.get("num_bikes_available", 0))}
+
+        return {}
         
 
     def distance(self, lat1, lon1, lat2, lon2):
